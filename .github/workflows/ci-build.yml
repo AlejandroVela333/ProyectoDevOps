@@ -37,6 +37,6 @@ jobs:
       - name: Construir y publicar ${{ matrix.service }}
         uses: docker/build-push-action@v6
         with:
-          context: ./src/${{ matrix.service }}
+          context: ${{ matrix.service == 'cartservice' && './src/cartservice/src' || format('./src/{0}', matrix.service) }}
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
