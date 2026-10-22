@@ -1,0 +1,28 @@
+name: Leer secretos de Vault
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probar-vault:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pedir secretos a Vault
+        uses: hashicorp/vault-action@v4
+        with:
+          url: ${{ vars.VAULT_ADDR }}
+          token: ${{ secrets.VAULT_TOKEN }}
+          secrets: |
+            secret/data/online-boutique/dockerhub username | DOCKERHUB_USERNAME ;
+            secret/data/online-boutique/dockerhub token | DOCKERHUB_TOKEN
+
+      - name: Comprobar que llegaron (sin mostrarlos)
+        run: |
+          echo "Usuario de Docker Hub: $DOCKERHUB_USERNAME"
+          echo "El token mide ${#DOCKERHUB_TOKEN} caracteres"
+
+      - name: Entrar a Docker Hub con lo que entrego Vault
+        uses: docker/login-action@v4
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
