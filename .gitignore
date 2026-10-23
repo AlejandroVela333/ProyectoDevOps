@@ -32,3 +32,10 @@ gha-creds-*.json
 terraform-local/online-boutique-config
 .terraform/
 *.tfstate
+
+# Lock files locales que no forman parte de la entrega
+terraform-local/.terraform.lock.hcl
+terraform/.terraform.lock.hcl
+
+# Workflow local antiguo que no forma parte de la entrega actual
+.github/workflows/cd-helm.yml
