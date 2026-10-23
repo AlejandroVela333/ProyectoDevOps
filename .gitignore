@@ -5,7 +5,6 @@
 .kubernetes-manifests-*/
 .project
 .skaffold-*.yaml
-.terraform.lock.hcl
 .terraform/*
 .venv/
 .vs/
@@ -31,3 +30,5 @@ gha-creds-*.json
 # Terraform local de Fase II
 **/.terraform/
 terraform-local/online-boutique-config
+.terraform/
+*.tfstate

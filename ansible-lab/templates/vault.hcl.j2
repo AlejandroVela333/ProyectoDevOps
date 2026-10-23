@@ -1,0 +1,13 @@
+# Generado por Ansible, no editar a mano
+ui            = {{ vault_ui | lower }}
+disable_mlock = true
+api_addr      = "http://127.0.0.1:8200"
+
+storage "file" {
+  path = "{{ vault_data_dir }}"
+}
+
+listener "tcp" {
+  address     = "0.0.0.0:8200"
+  tls_disable = 1
+}
