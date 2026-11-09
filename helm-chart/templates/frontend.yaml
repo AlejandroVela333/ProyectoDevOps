@@ -35,6 +35,7 @@ metadata:
   labels:
     app: {{ .Values.frontend.name }}
 spec:
+  replicas: {{ .Values.frontend.replicas | default 1 }}
   selector:
     matchLabels:
       app: {{ .Values.frontend.name }}
