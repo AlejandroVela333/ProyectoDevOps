@@ -304,6 +304,12 @@ Las capturas y la grabación de la demo deben guardarse en el portafolio de evid
 | Despliegue pendiente | Runner local apagado o sin conexión con kind | Comprobar Docker Desktop, `kubectl get nodes` y `Listening for Jobs` |
 | Error de comando Helm | Diferencias de sintaxis entre Bash y PowerShell | Mantener la ejecución compatible con el runner Windows |
 
+## Conclusiones
+
+La Fase IV documenta un flujo DevOps reproducible para el laboratorio: Terraform define la infraestructura, Ansible configura Vault, GitHub Actions obtiene las credenciales autorizadas, construye y publica las imágenes, y el runner local despliega el chart de Helm en kind. Las evidencias históricas confirman una ejecución exitosa del pipeline y una segunda ejecución idempotente de Ansible, pero no representan una garantía de disponibilidad ni rendimiento en sesiones posteriores.
+
+El principal aprendizaje es que la automatización mejora la trazabilidad y reduce pasos manuales, mientras que la operación todavía depende de elementos temporales del laboratorio, como las credenciales de AWS Academy, la IP pública de la EC2, el estado de sellado de Vault y la disponibilidad del runner local. Por ello, las verificaciones previas y las mejoras de seguridad indicadas en la siguiente sección siguen siendo necesarias.
+
 ## Límites y siguientes pasos
 
 - La instancia de AWS Academy y las credenciales son **temporales**.
