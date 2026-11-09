@@ -1,169 +1,325 @@
-<!-- <p align="center">
-<img src="/src/frontend/static/icons/Hipster_HeroLogoMaroon.svg" width="300" alt="Online Boutique" />
-</p> -->
-![Continuous Integration](https://github.com/GoogleCloudPlatform/microservices-demo/workflows/Continuous%20Integration%20-%20Main/Release/badge.svg)
+# Online Boutique — Proyecto Integrador DevOps (Fases I–IV)
 
-**Online Boutique** is a cloud-first microservices demo application.  The application is a
-web-based e-commerce app where users can browse items, add them to the cart, and purchase them.
+**Infraestructura reproducible, integración y despliegue continuo y administración centralizada de secretos** para una aplicación demostrativa de comercio electrónico.
 
-Google uses this application to demonstrate how developers can modernize enterprise applications using Google Cloud products, including: [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine), [Cloud Service Mesh (CSM)](https://cloud.google.com/service-mesh), [gRPC](https://grpc.io/), [Cloud Operations](https://cloud.google.com/products/operations), [Spanner](https://cloud.google.com/spanner), [Memorystore](https://cloud.google.com/memorystore), [AlloyDB](https://cloud.google.com/alloydb), and [Gemini](https://ai.google.dev/). This application works on any Kubernetes cluster.
+**Proyecto académico:** Proyecto Integrador de la Metodología DevOps · **Aplicación base:** [Google Cloud Online Boutique](https://github.com/GoogleCloudPlatform/microservices-demo) · **Repositorio de trabajo:** [ProyectoDevOps](https://github.com/AlejandroVela333/ProyectoDevOps)
 
-If you’re using this demo, please **★Star** this repository to show your interest!
+> **Alcance:** entorno de laboratorio, no despliegue de producción. Online Boutique es una aplicación de referencia de Google Cloud; el trabajo académico se centra en automatizar su infraestructura, construcción, distribución y operación.
 
-**Note to Googlers:** Please fill out the form at [go/microservices-demo](http://go/microservices-demo).
+## El problema
 
-## Architecture
+Desplegar una aplicación compuesta por múltiples servicios mediante instrucciones manuales implica pasos repetitivos, posibles diferencias entre entornos y mayor dificultad para comprobar qué configuración se utilizó. También resulta arriesgado gestionar credenciales de publicación directamente en el código o repartirlas entre varias herramientas.
 
-**Online Boutique** is composed of 11 microservices written in different
-languages that talk to each other over gRPC.
+En este proyecto académico se estudian esos riesgos mediante Online Boutique. **No se atribuyen métricas de pérdidas o incidentes a una empresa real**: se plantea un escenario representativo para evaluar el valor de DevOps.
 
-[![Architecture of
-microservices](/docs/img/architecture-diagram.png)](/docs/img/architecture-diagram.png)
+## La propuesta (Fase I)
 
-Find **Protocol Buffers Descriptions** at the [`./protos` directory](/protos).
+Definir un proceso versionado y repetible para que un cambio en el repositorio pueda construirse, publicarse y desplegarse mediante herramientas coordinadas. Los beneficios **buscados** son:
 
-| Service                                              | Language      | Description                                                                                                                       |
-| ---------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| [frontend](/src/frontend)                           | Go            | Exposes an HTTP server to serve the website. Does not require signup/login and generates session IDs for all users automatically. |
-| [cartservice](/src/cartservice)                     | C#            | Stores the items in the user's shopping cart in Redis and retrieves it.                                                           |
-| [productcatalogservice](/src/productcatalogservice) | Go            | Provides the list of products from a JSON file and ability to search products and get individual products.                        |
-| [currencyservice](/src/currencyservice)             | Node.js       | Converts one money amount to another currency. Uses real values fetched from European Central Bank. It's the highest QPS service. |
-| [paymentservice](/src/paymentservice)               | Node.js       | Charges the given credit card info (mock) with the given amount and returns a transaction ID.                                     |
-| [shippingservice](/src/shippingservice)             | Go            | Gives shipping cost estimates based on the shopping cart. Ships items to the given address (mock)                                 |
-| [emailservice](/src/emailservice)                   | Python        | Sends users an order confirmation email (mock).                                                                                   |
-| [checkoutservice](/src/checkoutservice)             | Go            | Retrieves user cart, prepares order and orchestrates the payment, shipping and the email notification.                            |
-| [recommendationservice](/src/recommendationservice) | Python        | Recommends other products based on what's given in the cart.                                                                      |
-| [adservice](/src/adservice)                         | Java          | Provides text ads based on given context words.                                                                                   |
-| [loadgenerator](/src/loadgenerator)                 | Python/Locust | Continuously sends requests imitating realistic user shopping flows to the frontend.                                              |
+- **Trazabilidad:** registrar cambios de configuración y código con Git y GitHub.
+- **Menos pasos manuales:** automatizar compilación de imágenes, publicación y despliegue con GitHub Actions, Docker y Helm.
+- **Infraestructura como código:** definir el clúster local y la instancia AWS con Terraform.
+- **Configuración consistente:** instalar y configurar Vault con Ansible.
+- **Control de secretos:** almacenar las credenciales de Docker Hub en Vault y permitir al pipeline solo la lectura necesaria.
 
-## Screenshots
+Los resultados medidos y sus límites se presentan más adelante; estos beneficios no deben confundirse con ahorros económicos demostrados.
 
-| Home Page                                                                                                         | Checkout Screen                                                                                                    |
-| ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| [![Screenshot of store homepage](/docs/img/online-boutique-frontend-1.png)](/docs/img/online-boutique-frontend-1.png) | [![Screenshot of checkout screen](/docs/img/online-boutique-frontend-2.png)](/docs/img/online-boutique-frontend-2.png) |
+## La aplicación
 
-## Quickstart (GKE)
+Online Boutique simula una tienda en línea con catálogo, carrito, proceso de compra, recomendaciones, envíos y pagos de prueba. Su documentación base describe **11 microservicios en cinco lenguajes**. Nuestro workflow construye **12 imágenes** porque también incluye `shoppingassistantservice` en su matriz; el número de imágenes del pipeline no debe confundirse con el recuento de servicios de la descripción base. El chart de Helm actual mantiene `shoppingAssistantService.create: false` y señala que ese servicio todavía no está disponible en el chart, por lo que construir su imagen no implica que Helm lo despliegue.
 
-1. Ensure you have the following requirements:
-   - [Google Cloud project](https://cloud.google.com/resource-manager/docs/creating-managing-projects#creating_a_project).
-   - Shell environment with `gcloud`, `git`, and `kubectl`.
+## Arquitectura
 
-2. Clone the latest major version.
+La **instancia EC2 con Vault** se ejecuta en AWS Academy Learner Lab. El **clúster Kubernetes kind** y el **runner self-hosted** funcionan en el equipo local con Windows/Docker Desktop. Los trabajos de construcción corren en runners administrados de GitHub (`ubuntu-latest`).
 
-   ```sh
-   git clone --depth 1 --branch v0 https://github.com/GoogleCloudPlatform/microservices-demo.git
-   cd microservices-demo/
-   ```
+```mermaid
+flowchart TB
+  subgraph PREP[Preparación de infraestructura]
+    TFA[Terraform AWS] -->|aprovisiona| EC2[EC2 Ubuntu con Vault]
+    ANS[Ansible] -->|instala y configura| EC2
+    TFL[Terraform local] -->|crea| KIND[kind: Online Boutique]
+  end
+  DEV[Desarrollador] -->|git push a main| GH[Repositorio GitHub]
+  GH -->|dispara| CI[GitHub Actions]
+  CI -->|vault-action: consulta secretos| EC2
+  CI -->|build y push| DH[Docker Hub: imágenes]
+  CI -->|job deploy| RUN[Runner self-hosted Windows]
+  RUN -->|helm upgrade --install| KIND
+  DH -->|descarga de imágenes| KIND
+  KIND -->|port-forward| WEB[Navegador: localhost:8080]
+```
 
-   The `--depth 1` argument skips downloading git history.
+**Secuencia:** Terraform aprovisiona infraestructura; Ansible prepara Vault; el pipeline consulta credenciales de Vault, construye y publica imágenes en Docker Hub; el runner local ejecuta Helm en kind; finalmente se comprueba la tienda en el navegador. La preparación de infraestructura **no se ejecuta necesariamente en cada push**.
 
-3. Set the Google Cloud project and region and ensure the Google Kubernetes Engine API is enabled.
+## Tecnologías usadas
 
-   ```sh
-   export PROJECT_ID=<PROJECT_ID>
-   export REGION=us-central1
-   gcloud services enable container.googleapis.com \
-     --project=${PROJECT_ID}
-   ```
+| Herramienta | Función en este proyecto |
+|---|---|
+| Git / GitHub | Código y cambios versionados |
+| Terraform (AWS) | EC2 Ubuntu, registro de llave pública SSH, grupo de seguridad y salida IP |
+| Terraform (kind) | Clúster Kubernetes local |
+| Docker / Docker Hub | Construcción y registro de imágenes |
+| GitHub Actions | Automatización del flujo CI/CD |
+| Runner self-hosted (Windows) | Ejecuta Helm con acceso al clúster local |
+| Helm / Kubernetes kind | Instalación y actualización de microservicios |
+| Ansible | Instalación, configuración y arranque de Vault |
+| HashiCorp Vault | Secretos KV v2, políticas y tokens |
 
-   Substitute `<PROJECT_ID>` with the ID of your Google Cloud project.
+## Cómo funciona
 
-4. Create a GKE cluster and get the credentials for it.
+### Infraestructura: Terraform
 
-   ```sh
-   gcloud container clusters create-auto online-boutique \
-     --project=${PROJECT_ID} --region=${REGION}
-   ```
+**Archivos:** [`terraform_aws/main.tf`](terraform_aws/main.tf) y [`terraform-local/main.tf`](terraform-local/main.tf).
 
-   Creating the cluster may take a few minutes.
+El primer archivo declara la región `us-east-1`, una AMI Ubuntu 24.04, una instancia `t3.micro`, el registro en AWS de una llave pública SSH local y un grupo de seguridad para el laboratorio. Expone la IP de la máquina como salida:
 
-5. Deploy Online Boutique to the cluster.
+```hcl
+resource "aws_instance" "vault" {
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = "t3.micro"
+  key_name               = aws_key_pair.llave.key_name
+  vpc_security_group_ids = [aws_security_group.vault.id]
+}
 
-   ```sh
-   kubectl apply -f ./release/kubernetes-manifests.yaml
-   ```
+output "ip_publica" {
+  value = aws_instance.vault.public_ip
+}
+```
 
-6. Wait for the pods to be ready.
+El segundo archivo declara el clúster local:
 
-   ```sh
-   kubectl get pods
-   ```
+```hcl
+resource "kind_cluster" "online_boutique" {
+  name = "online-boutique"
+}
+```
 
-   After a few minutes, you should see the Pods in a `Running` state:
+**Por qué existe:** permite revisar y reproducir los recursos declarados, en lugar de reconstruirlos manualmente desde interfaces gráficas. **Sin él:** se pierde una definición versionada del entorno y aumenta la dependencia de instrucciones manuales. `terraform apply` administra recursos según el estado y la configuración: **no debe ejecutarse sin revisar antes el plan**.
 
-   ```
-   NAME                                     READY   STATUS    RESTARTS   AGE
-   adservice-76bdd69666-ckc5j               1/1     Running   0          2m58s
-   cartservice-66d497c6b7-dp5jr             1/1     Running   0          2m59s
-   checkoutservice-666c784bd6-4jd22         1/1     Running   0          3m1s
-   currencyservice-5d5d496984-4jmd7         1/1     Running   0          2m59s
-   emailservice-667457d9d6-75jcq            1/1     Running   0          3m2s
-   frontend-6b8d69b9fb-wjqdg                1/1     Running   0          3m1s
-   loadgenerator-665b5cd444-gwqdq           1/1     Running   0          3m
-   paymentservice-68596d6dd6-bf6bv          1/1     Running   0          3m
-   productcatalogservice-557d474574-888kr   1/1     Running   0          3m
-   recommendationservice-69c56b74d4-7z8r5   1/1     Running   0          3m1s
-   redis-cart-5f59546cdd-5jnqf              1/1     Running   0          2m58s
-   shippingservice-6ccc89f8fd-v686r         1/1     Running   0          2m58s
-   ```
+> **Consideración de seguridad:** en el ejemplo académico, `terraform_aws/main.tf` permite entrada a los puertos 22 y 8200 desde `0.0.0.0/0`, y el listener de Vault tiene TLS deshabilitado. Esta configuración **no es apropiada para producción**. Para una implementación real, restringir orígenes, exigir TLS y revisar la política de acceso.
 
-7. Access the web frontend in a browser using the frontend's external IP.
+### Pipeline CI/CD: GitHub Actions, Docker Hub y Helm
 
-   ```sh
-   kubectl get service frontend-external | awk '{print $4}'
-   ```
+**Archivos:** [`.github/workflows/ci-build.yml`](.github/workflows/ci-build.yml), [`.github/workflows/vault-demo.yml`](.github/workflows/vault-demo.yml) y [`helm-chart/`](helm-chart/).
 
-   Visit `http://EXTERNAL_IP` in a web browser to access your instance of Online Boutique.
+1. Un **push a `main`** activa `CI/CD - Build, Push and Deploy`.
+2. La matriz del job `build-and-push` construye **12 imágenes** en runners `ubuntu-latest`.
+3. Cada trabajo consulta credenciales de Docker Hub mediante `hashicorp/vault-action@v4` y publica su imagen `:latest`.
+4. El job `deploy` espera que termine `build-and-push` (`needs: build-and-push`).
+5. Un runner `self-hosted` con acceso al clúster local ejecuta Helm.
 
-8. Congrats! You've deployed the default Online Boutique. To deploy a different variation of Online Boutique (e.g., with Google Cloud Operations tracing, Istio, etc.), see [Deploy Online Boutique variations with Kustomize](#deploy-online-boutique-variations-with-kustomize).
+Fragmento relevante de `ci-build.yml` (la versión del repositorio usa `vault-action@v4`):
 
-9. Once you are done with it, delete the GKE cluster.
+```yaml
+- name: Pedir credenciales de Docker Hub a Vault
+  uses: hashicorp/vault-action@v4
+  with:
+    url: ${{ vars.VAULT_ADDR }}
+    token: ${{ secrets.VAULT_TOKEN }}
+    secrets: |
+      secret/data/online-boutique/dockerhub username | DOCKERHUB_USERNAME ;
+      secret/data/online-boutique/dockerhub token | DOCKERHUB_TOKEN
+```
 
-   ```sh
-   gcloud container clusters delete online-boutique \
-     --project=${PROJECT_ID} --region=${REGION}
-   ```
+Despliegue definido en el mismo workflow:
 
-   Deleting the cluster may take a few minutes.
+```bash
+helm upgrade --install online-boutique ./helm-chart --set images.repository=USUARIO_DOCKERHUB --set images.tag=latest
+```
 
-## Additional deployment options
+En el workflow, `USUARIO_DOCKERHUB` se obtiene de Vault como variable de entorno, no se escribe como credencial literal. El archivo `vault-demo.yml` permite ejecutar manualmente una prueba acotada de consulta de secretos y autenticación con Docker Hub antes de probar el pipeline completo.
 
-- **Terraform**: [See these instructions](/terraform) to learn how to deploy Online Boutique using [Terraform](https://www.terraform.io/intro).
-- **Istio / Cloud Service Mesh**: [See these instructions](/kustomize/components/service-mesh-istio/README.md) to deploy Online Boutique alongside an Istio-backed service mesh.
-- **Non-GKE clusters (Minikube, Kind, etc)**: See the [Development guide](/docs/development-guide.md) to learn how you can deploy Online Boutique on non-GKE clusters.
-- **AI assistant using Gemini**: [See these instructions](/kustomize/components/shopping-assistant/README.md) to deploy a Gemini-powered AI assistant that suggests products to purchase based on an image.
-- **And more**: The [`/kustomize` directory](/kustomize) contains instructions for customizing the deployment of Online Boutique with other variations.
+**Por qué existe:** conecta la publicación de cambios con la generación y entrega de imágenes. **Sin él:** cada etapa exigiría intervención manual y sería más difícil reproducir el proceso. **Límite:** el despliegue requiere que Vault esté accesible y que el runner local y kind estén funcionando.
 
-## Documentation
+### Configuración y secretos: Ansible y Vault
 
-- [Development](/docs/development-guide.md) to learn how to run and develop this app locally.
+**Archivos:** [`ansible-lab/instalar-vault.yml`](ansible-lab/instalar-vault.yml), [`ansible-lab/templates/vault.hcl.j2`](ansible-lab/templates/vault.hcl.j2), [`ansible-lab/group_vars/vault.yml`](ansible-lab/group_vars/vault.yml), [`ansible-lab/politicas/ci-readonly.hcl`](ansible-lab/politicas/ci-readonly.hcl).
 
-## Demos featuring Online Boutique
+El playbook agrega el repositorio de HashiCorp, instala Vault, crea el directorio persistente, genera `/etc/vault.d/vault.hcl` desde una plantilla y habilita el servicio. Su *handler* reinicia Vault cuando cambia la plantilla. Las variables definen el directorio de almacenamiento `/opt/vault/data` y habilitan la UI.
 
-- [Security hardening of the OnlineBoutique sample apps with the Docker Hardened Images (DHI)](https://medium.com/google-cloud/security-hardening-of-the-onlineboutique-sample-apps-with-docker-hardened-images-dhi-ca1fad348343)
-- [alpine, distroless or scratch?](https://medium.com/google-cloud/alpine-distroless-or-scratch-caac35250e0b)
-- [Platform Engineering in action: Deploy the Online Boutique sample apps with Score and Humanitec](https://medium.com/p/d99101001e69)
-- [The new Kubernetes Gateway API with Istio and Anthos Service Mesh (ASM)](https://medium.com/p/9d64c7009cd)
-- [Use Azure Redis Cache with the Online Boutique sample on AKS](https://medium.com/p/981bd98b53f8)
-- [Sail Sharp, 8 tips to optimize and secure your .NET containers for Kubernetes](https://medium.com/p/c68ba253844a)
-- [Deploy multi-region application with Anthos and Google cloud Spanner](https://medium.com/google-cloud/a2ea3493ed0)
-- [Use Google Cloud Memorystore (Redis) with the Online Boutique sample on GKE](https://medium.com/p/82f7879a900d)
-- [Use Helm to simplify the deployment of Online Boutique, with a Service Mesh, GitOps, and more!](https://medium.com/p/246119e46d53)
-- [How to reduce microservices complexity with Apigee and Anthos Service Mesh](https://cloud.google.com/blog/products/application-modernization/api-management-and-service-mesh-go-together)
-- [gRPC health probes with Kubernetes 1.24+](https://medium.com/p/b5bd26253a4c)
-- [Use Google Cloud Spanner with the Online Boutique sample](https://medium.com/p/f7248e077339)
-- [Seamlessly encrypt traffic from any apps in your Mesh to Memorystore (redis)](https://medium.com/google-cloud/64b71969318d)
-- [Strengthen your app's security with Cloud Service Mesh and Anthos Config Management](https://cloud.google.com/service-mesh/docs/strengthen-app-security)
-- [From edge to mesh: Exposing service mesh applications through GKE Ingress](https://cloud.google.com/architecture/exposing-service-mesh-apps-through-gke-ingress)
-- [Take the first step toward SRE with Cloud Operations Sandbox](https://cloud.google.com/blog/products/operations/on-the-road-to-sre-with-cloud-operations-sandbox)
-- [Deploying the Online Boutique sample application on Cloud Service Mesh](https://cloud.google.com/service-mesh/docs/onlineboutique-install-kpt)
-- [Anthos Service Mesh Workshop: Lab Guide](https://codelabs.developers.google.com/codelabs/anthos-service-mesh-workshop)
-- [KubeCon EU 2019 - Reinventing Networking: A Deep Dive into Istio's Multicluster Gateways - Steve Dake, Independent](https://youtu.be/-t2BfT59zJA?t=982)
-- Google Cloud Next'18 SF
-  - [Day 1 Keynote](https://youtu.be/vJ9OaAqfxo4?t=2416) showing GKE On-Prem
-  - [Day 3 Keynote](https://youtu.be/JQPOPV_VH5w?t=815) showing Stackdriver
-    APM (Tracing, Code Search, Profiler, Google Cloud Build)
-  - [Introduction to Service Management with Istio](https://www.youtube.com/watch?v=wCJrdKdD6UM&feature=youtu.be&t=586)
-- [Google Cloud Next'18 London – Keynote](https://youtu.be/nIq2pkNcfEI?t=3071)
-  showing Stackdriver Incident Response Management
-- [Microservices demo showcasing Go Micro](https://github.com/go-micro/demo)
+```yaml
+- name: Generar configuracion de Vault desde template
+  ansible.builtin.template:
+    src: vault.hcl.j2
+    dest: /etc/vault.d/vault.hcl
+    owner: vault
+    group: vault
+    mode: "0640"
+  notify: Reiniciar Vault
+```
+
+La política del pipeline limita la lectura a los secretos necesarios:
+
+```hcl
+path "secret/data/online-boutique/*" {
+  capabilities = ["read"]
+}
+```
+
+**Por qué existe:** separa las credenciales de Docker Hub del repositorio y reduce los privilegios del pipeline. **Sin él:** el workflow tendría que utilizar otra fuente de credenciales y sería más difícil aplicar el principio de mínimo privilegio. Vault usa tokens con tiempo de vida (TTL): un token caducado debe renovarse de forma controlada antes de la demo.
+
+## Cómo levantarlo: guía de laboratorio
+
+**Importante:** los comandos siguientes corresponden a la estructura comprobada del repositorio. Deben ejecutarse en el entorno correcto y reemplazar los marcadores por los valores vigentes del laboratorio. No pegues secretos, claves de *unseal*, PAT ni credenciales de AWS en el README, el chat de clase o el repositorio.
+
+### Requisitos previos
+
+- **En Windows:** Docker Desktop operativo, PowerShell, `kubectl`, `helm`, runner registrado en `C:\actions-runner`, y el repositorio clonado.
+- **En WSL/Linux:** `terraform`, `aws`, `ansible`, cliente `vault`, acceso SSH y la llave privada local correspondiente a `fase3-vault`.
+- AWS Academy Learner Lab iniciado y credenciales temporales vigentes guardadas **solo localmente** en `~/.aws/credentials`.
+- Vault previamente inicializado y llaves de *unseal* custodiadas de forma privada. **No inicializarlo de nuevo** si ya existe.
+- GitHub Actions con variable `VAULT_ADDR` y secreto `VAULT_TOKEN` vigentes.
+
+### A. Recuperar AWS y verificar la EC2 (WSL/Linux)
+
+Inicia AWS Academy Learner Lab y actualiza localmente `~/.aws/credentials` con los valores temporales del portal (sin subir ese archivo). Confirma la sesión:
+
+```bash
+aws sts get-caller-identity
+cd RUTA_LOCAL_DEL_REPOSITORIO/terraform_aws
+terraform init
+terraform output ip_publica
+terraform plan -refresh-only
+terraform apply -refresh-only
+terraform output ip_publica
+```
+
+`refresh-only` sincroniza el estado con AWS y no busca aplicar cambios a los recursos; revisa el plan antes de confirmarlo. Si la infraestructura no existe, **no improvises un nuevo `apply` durante la demo**: revisa los recursos, el estado y el plan con el profesor antes de crearla.
+
+### B. Conectar Ansible y verificar Vault (WSL/Linux)
+
+Actualiza `ansible-lab/inventario-aws.ini` con la IP pública obtenida y verifica SSH/Ansible. Desde la raíz del repositorio:
+
+```bash
+cd RUTA_LOCAL_DEL_REPOSITORIO/ansible-lab
+ansible vault -i inventario-aws.ini -m ping
+ansible-playbook -i inventario-aws.ini instalar-vault.yml
+```
+
+Si solo quieres comprobar que el playbook no introduciría cambios, puedes usar antes `ansible-playbook -i inventario-aws.ini instalar-vault.yml --check`, teniendo presente que el modo check no simula todas las tareas con la misma fidelidad.
+
+Establece la dirección de Vault con **la IP actual**:
+
+```bash
+export VAULT_ADDR='http://IP_PUBLICA_ACTUAL:8200'
+vault status
+```
+
+Si aparece `Sealed: true`, desella Vault **ingresando dos llaves distintas en modo interactivo** y sin registrar sus valores:
+
+```bash
+vault operator unseal
+vault operator unseal
+vault status
+```
+
+Confirma `Initialized: true` y `Sealed: false`. No ejecutes `vault operator init` otra vez ni imprimas credenciales. Si la IP cambió, actualiza también `VAULT_ADDR` en **GitHub → Settings → Secrets and variables → Actions → Variables**. Verifica que el secreto `VAULT_TOKEN` no esté vencido; renovar uno requiere acceso autorizado a Vault y actualizar el secreto en GitHub.
+
+### C. Levantar kind y el runner (Windows PowerShell)
+
+Abre Docker Desktop y comprueba que su motor esté funcionando. En PowerShell:
+
+```powershell
+kubectl config get-contexts
+kubectl config use-context kind-online-boutique
+kubectl get nodes
+kubectl get pods
+```
+
+Si el clúster **no existe**, utiliza Terraform desde el directorio local apropiado **solo después de revisar el plan**:
+
+```powershell
+cd RUTA_LOCAL_DEL_REPOSITORIO\terraform-local
+terraform init
+terraform plan
+terraform apply
+kubectl get nodes
+```
+
+`RUTA_LOCAL_DEL_REPOSITORIO` es un marcador y debe sustituirse por la ubicación real. Si el clúster ya está disponible, no hace falta recrearlo.
+
+En **otra ventana de PowerShell** inicia el runner:
+
+```powershell
+cd C:\actions-runner
+.\run.cmd
+```
+
+Debe indicar que está conectado y escuchando trabajos (*Listening for Jobs*). Mantén abierta esa terminal durante la demo.
+
+### D. Abrir Online Boutique (Windows PowerShell)
+
+Con el frontend desplegado y listo:
+
+```powershell
+kubectl get deployments
+kubectl get pods
+kubectl port-forward deployment/frontend 8080:8080
+```
+
+Mantén la ventana del `port-forward` abierta y visita **http://localhost:8080**. Si la aplicación fue desplegada en otro namespace, ajusta los comandos al namespace real.
+
+### E. Probar el pipeline y verificar el resultado
+
+1. Confirma **antes de cualquier push** que Vault responde, el token de CI está vigente, Docker Hub es accesible, el runner está activo y kind tiene su nodo listo.
+2. En GitHub, abre **Actions → Leer secretos de Vault** si quieres ejecutar primero la prueba `vault-demo.yml` manualmente.
+3. Para la prueba completa, realiza un cambio pequeño, revisado y reversible en una rama de trabajo; **llevar ese cambio a `main` activa automáticamente el pipeline**. Un cambio exclusivo en README también activa la construcción completa según el workflow actual.
+4. Abre **Actions → CI/CD - Build, Push and Deploy** y verifica los 12 trabajos `build-and-push` y el job `deploy`. El despliegue corre en el runner local.
+5. Comprueba el resultado:
+
+```powershell
+kubectl get pods
+kubectl get deployments
+helm list
+```
+
+6. Vuelve a abrir la tienda en `http://localhost:8080` y anota el tiempo de inicio del laboratorio y la duración del workflow.
+
+**Precaución para la demostración:** no uses `terraform destroy`, no expongas las llaves de Vault y no cambies configuraciones de seguridad o número de réplicas sin haber ensayado y validado el impacto primero.
+
+## Resultados comprobados y evidencias
+
+En las prácticas anteriores se documentaron estos resultados **históricos del laboratorio**:
+
+| Comprobación | Evidencia disponible | Interpretación |
+|---|---|---|
+| GitHub Actions | 12 builds y job de despliegue exitosos | Funcionó una ejecución de construcción, publicación y entrega |
+| Tiempo de un workflow documentado | **2 min 19 s** | Duración de esa corrida; no es un promedio ni el tiempo de arranque completo |
+| Ansible | Segunda ejecución `changed=0`, `unreachable=0`, `failed=0` | La configuración no necesitó nuevos cambios en esa repetición |
+| Vault | Motor KV v2 y política `ci-readonly` | Credenciales centralizadas y autorización de lectura limitada |
+| GitHub Secrets | Se conservó `VAULT_TOKEN`, sin los secretos directos de Docker Hub | El pipeline obtuvo las credenciales de Docker Hub desde Vault |
+
+**Pendiente de la Fase IV:** medir el tiempo de arranque desde cero y grabar una demo completa de 5–7 minutos. Un éxito histórico del pipeline **no garantiza** que AWS Academy, Vault o el runner estén activos en una sesión posterior.
+
+Las capturas y la grabación de la demo deben guardarse en el portafolio de evidencias. Se recomienda mostrar solamente las partes relevantes y ocultar valores privados, claves, tokens y demás datos sensibles.
+
+## Retos y lecciones aprendidas
+
+| Qué pasó | Por qué pasó | Cómo se resolvió / aprendizaje |
+|---|---|---|
+| AWS rechazó la conexión | Credenciales temporales de Learner Lab vencidas | Renovar credenciales localmente y comprobar con `aws sts get-caller-identity` |
+| Cambió la IP de la EC2 | Reinicio de una instancia sin IP fija | Actualizar el estado con Terraform y corregir inventario y `VAULT_ADDR` |
+| Vault apareció sellado | Reinicio del servicio / servidor | Desellar con dos llaves autorizadas y verificar `vault status` |
+| GitHub rechazó un cambio al workflow | Token de GitHub sin los permisos necesarios | Corregir permisos del PAT y repetir el push controlado |
+| Despliegue pendiente | Runner local apagado o sin conexión con kind | Comprobar Docker Desktop, `kubectl get nodes` y `Listening for Jobs` |
+| Error de comando Helm | Diferencias de sintaxis entre Bash y PowerShell | Mantener la ejecución compatible con el runner Windows |
+
+## Conclusiones
+
+La Fase IV documenta un flujo DevOps reproducible para el laboratorio: Terraform define la infraestructura, Ansible configura Vault, GitHub Actions obtiene las credenciales autorizadas, construye y publica las imágenes, y el runner local despliega el chart de Helm en kind. Las evidencias históricas confirman una ejecución exitosa del pipeline y una segunda ejecución idempotente de Ansible, pero no representan una garantía de disponibilidad ni rendimiento en sesiones posteriores.
+
+El principal aprendizaje es que la automatización mejora la trazabilidad y reduce pasos manuales, mientras que la operación todavía depende de elementos temporales del laboratorio, como las credenciales de AWS Academy, la IP pública de la EC2, el estado de sellado de Vault y la disponibilidad del runner local. Por ello, las verificaciones previas y las mejoras de seguridad indicadas en la siguiente sección siguen siendo necesarias.
+
+## Límites y siguientes pasos
+
+- La instancia de AWS Academy y las credenciales son **temporales**.
+- El laboratorio utiliza configuraciones que requieren endurecimiento antes de producción: **TLS para Vault**, limitar los puertos 22/8200, rotación de tokens, control de acceso y gestión adecuada de secretos.
+- En una solución empresarial se añadirían pruebas automatizadas, observabilidad y controles de despliegue (por ejemplo, versiones de imágenes inmutables en lugar de depender solamente de `latest`).
+
+## Autor y referencias
+
+**Nahin Alejandro Vela Rosado** · Proyecto Integrador de DevOps · Fase IV, noviembre de 2026.
+
+- [Online Boutique — proyecto original de Google Cloud](https://github.com/GoogleCloudPlatform/microservices-demo)
+- [Repositorio de trabajo de este proyecto](https://github.com/AlejandroVela333/ProyectoDevOps)
+- Material de la materia: Fase IV, clases 1, 2 y 3 (2, 4 y 9 de noviembre de 2026).
