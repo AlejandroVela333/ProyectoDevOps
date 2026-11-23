@@ -279,19 +279,24 @@ helm list
 
 ## Resultados comprobados y evidencias
 
-En las prácticas anteriores se documentaron estos resultados **históricos del laboratorio**:
+La demostración final de la Fase IV produjo los siguientes resultados comprobados en el laboratorio:
 
 | Comprobación | Evidencia disponible | Interpretación |
 |---|---|---|
-| GitHub Actions | 12 builds y job de despliegue exitosos | Funcionó una ejecución de construcción, publicación y entrega |
-| Tiempo de un workflow documentado | **2 min 19 s** | Duración de esa corrida; no es un promedio ni el tiempo de arranque completo |
-| Ansible | Segunda ejecución `changed=0`, `unreachable=0`, `failed=0` | La configuración no necesitó nuevos cambios en esa repetición |
-| Vault | Motor KV v2 y política `ci-readonly` | Credenciales centralizadas y autorización de lectura limitada |
-| GitHub Secrets | Se conservó `VAULT_TOKEN`, sin los secretos directos de Docker Hub | El pipeline obtuvo las credenciales de Docker Hub desde Vault |
+| Preparación manual del entorno | **25 min** para preparar Docker Desktop, Kubernetes kind, Vault y el runner self-hosted | Tiempo necesario para dejar disponibles los componentes del laboratorio antes de ejecutar la automatización |
+| GitHub Actions | [Ejecución #13, intento 2](https://github.com/AlejandroVela333/ProyectoDevOps/actions/runs/44234225288) completada correctamente, con 12 trabajos `build-and-push` exitosos | Se completaron la construcción y publicación de las 12 imágenes Docker |
+| Pipeline CI/CD | **2 min 14 s** | Duración total de la ejecución automatizada exitosa; no incluye la preparación manual del laboratorio |
+| Trabajo `deploy` | **15 s** | El runner self-hosted completó el despliegue mediante Helm |
+| Helm | Cambio de `frontend.replicas` de `1` a `2` en `helm-chart/values.yaml` | El cambio declarativo fue procesado por el pipeline, sin escalado manual del Deployment |
+| Kubernetes | Deployment `frontend` en estado `2/2` y dos pods en estado `Running` | Las dos réplicas solicitadas quedaron disponibles y funcionando |
+| Ansible | Segunda ejecución: `ok=7`, `changed=0`, `unreachable=0`, `failed=0` | La configuración fue idempotente y no necesitó nuevos cambios en esa repetición |
+| Vault | Credenciales de Docker Hub centralizadas y política `ci-readonly` | El pipeline tuvo autorización de lectura limitada a los secretos necesarios |
+| GitHub Secrets | Únicamente `VAULT_TOKEN` para consultar Vault; no se almacenaron directamente las credenciales de Docker Hub | Las credenciales de Docker Hub permanecieron centralizadas en Vault |
+| Demostración grabada | **2 min 41 s** | Se mostró el cambio de una a dos réplicas, la construcción, publicación y despliegue con GitHub Actions y la verificación final en Kubernetes |
 
-**Pendiente de la Fase IV:** medir el tiempo de arranque desde cero y grabar una demo completa de 5–7 minutos. Un éxito histórico del pipeline **no garantiza** que AWS Academy, Vault o el runner estén activos en una sesión posterior.
+Los **25 minutos** corresponden a la preparación manual del laboratorio, mientras que los **2 minutos y 14 segundos** corresponden exclusivamente a la ejecución automatizada del pipeline. Son mediciones de etapas distintas y **no representan una reducción directa del tiempo de despliegue**.
 
-Las capturas y la grabación de la demo deben guardarse en el portafolio de evidencias. Se recomienda mostrar solamente las partes relevantes y ocultar valores privados, claves, tokens y demás datos sensibles.
+La demostración ya fue grabada: se modificó el frontend de una a dos réplicas, GitHub Actions completó la construcción, publicación y despliegue, y Kubernetes confirmó las dos réplicas funcionando. El video y el portafolio de evidencias en PDF se entregan por separado en Canvas; sus URLs definitivas se añadirán cuando estén disponibles. Las evidencias deben ocultar valores privados, claves, tokens y demás datos sensibles.
 
 ## Retos y lecciones aprendidas
 
